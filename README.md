@@ -38,7 +38,7 @@ a double purpose: it enables the `await` keyword within that method and it signa
 
 ## 🔄 Multithreading vs Single Threading
 
-![Single-threaded versus multithread with multiple requests](image.png)
+![Single-threaded versus multithread with multiple requests](images/image.png)
 
 In **multithreading**, we use multiple threads to do more work — just like multiple cooks making pizzas 🍕.
 
@@ -48,8 +48,8 @@ In **multithreading**, we use multiple threads to do more work — just like mul
 
 > Whenever the CPU needs to do something that happens outside the CPU itself (for example, reading a file), it sends the job to the component that handles it (the disk controller) and asks this component to notify the CPU when it’s done. The asynchronous (also called nonblocking) version of the file function just queues the operation with the operating system (that will then queue it with the disk controller) and returns immediately, letting the same thread do other stuff instead of waiting (figure 1.4). Later, we can check whether the operation has been completed and access the resulting data.
 
-![Three requests on a dual-core CPU](image-1.png)
-![Async version](image-2.png)
+![Three requests on a dual-core CPU](images/image-1.png)
+![Async version](images/image-2.png)
 
 > When starting the asynchronous operation, to ask the operating system to notify our program by calling a callback function we registered when starting the asynchronous operation. That callback function will need to run on a new thread (actually, a thread pool), because the original calling thread is not waiting and is currently doing something else. That’s why asynchronous programming and multithreading work well together. 
 
@@ -59,7 +59,7 @@ In **multithreading**, we use multiple threads to do more work — just like mul
 
 ### Yield return
 
-![Yield return](image-3.png)
+![Yield return](images/image-3.png)
 For `yield return`, the compiler divides your code into chunks and wraps them in a class that runs the correct chunk at the correct time to simulate a function that can be suspended and resumed.
 
 ### 📃 Tasks
@@ -116,8 +116,8 @@ After the task is completed, both `Task` and `Task<T>` have the `IsFaulted`, `Is
 2. We can no longer return an `value` because as an asynchronous method, our method will return immediately and complete its work later. It’s not possible to return an `value` because we don’t know the correct value at the time the method returns! So for that we use —`Task<int>`. 
 3. Insert the `await` keyword before the async method call call. The `await` keyword tells the compiler that the code needs to be suspended at this point and resumed when whatever async operation you are waiting for completes.
 
-![alt text](image-4.png)
-![alt text](image-5.png)
+![alt text](images/image-4.png)
+![alt text](images/image-5.png)
 Just like with `yield return`, the compiler divides the function into chunks and added code to call them at the correct time.
 
 > **⚠** You should not use `async void`
@@ -217,4 +217,30 @@ Console.WriteLine(theValue);
 ### 🔓 Deadlocks
 
 A deadlock is the situation where a thread or multiple threads are stuck waiting for something that will never happen. The simplest example is where one thread locked mutex A and is waiting for mutex B, while a second thread locked mutex B and is waiting for mutex A.
-![alt text](image-6.png)
+![alt text](images/image-6.png)
+
+### Background threads
+
+The `Thread.IsBackground = true` makes the thread so it terminates when the `Main` threads exists.
+An application exits when all the non-background threads exit.
+---
+
+### Lock and async/await
+
+You are not allowed  to use await inside the code block of the lock statement.
+There are 2 reasons : 
+* The conceptual problem is that calling await frees up the thread and potentially runs other code, so we don’t even know what code will run. This is a problem because, running code you don’t control while holding a lock can cause deadlocks.
+* The practical problem is that the code after the await can run on a different thread, and the system used internally by the lock statement only works if you release the lock from the same thread that locked it.
+
+The best solution is to rearrange your code and move the await outside of the lock block
+
+### When to use async/await ?
+
+- If your code needs to manage a large number of connections simultaneously, use async/await whenever you can.
+- If you are using an async-only API, use async/await whenever you use that API
+-  If you are writing a native UI application, and you have a problem with the UI freezing, use async/await in the specific long-running code that makes the UI freeze.
+- If your code creates a thread per request/item, and a significant part of the run time is I/O (for example, network or file access), consider using async/await.
+- If you add code to a codebase that already uses async/await extensively, use 
+async/await where it makes sense to you.
+- If you add code to a codebase that does not use async/await, avoid async/await in the code as much as possible. If you decide to use async/await in the new code, consider refactoring at least the code that calls the new code to also use async/await.
+- If you write code that only does one thing simultaneously, don’t use async/await
