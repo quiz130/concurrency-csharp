@@ -69,7 +69,7 @@ A Task represents an event that may happen in the future, while Task<T> represen
 
 > When we call `Task.Delay(1000)`, we get an object that represents an event that will happen in 1 second but has no corresponding thread or activity. In the same way, if we call `File.ReadAllBytesAsync`, and, for example, there is no thread reading in the background, the system asks the disk controller (a different hardware device than he CPU) to load data and calls us when it’s done, so we get back a `Task<byte[]>` object that represents the data that will be received from the disk in the future.
 
-So a Task or Task<T> object represents an event or a value that may be available in the future. When we want to know whether this event happened or the value is available yet, there are two asynchronous approaches supported by `Task` and `Task<T>` to use a travel metaphor, there are the “Are we there yet” model and the “Wake me up when we arrive” model. 
+So a Task or Task<T> object represents an event or a value that may be available in the future. When we want to know whether this event happened or the value is available yet, there are two asynchronous approaches supported by `Task` and `Task<T>` to use a travel metaphor, there are the “_Are we there yet_” model and the “_Wake me up when we arrive_” model. 
 
 ### ⏳ Are we there yet 
 
@@ -102,4 +102,119 @@ readCompleted.ContinueWith( t =>
 });
 ```
 
-Still this isnt very reliable
+Still this isnt very reliable.
+
+### Tasks 
+
+After the task is completed, both `Task` and `Task<T>` have the `IsFaulted`, `IsCanceled`, `IsCompleted`
+
+> To summarize, when using tasks without async/await, you can use the IsCompleted or Status properties to ask “Are we there yet?” And just like in a car, you don’t want to ask too often. You can use ContinueWith to make the task call you when it completes (“Wake me up when we arrive”). Finally, you can call Wait or Result to make the task synchronous, but that’s inefficient and dangerous because it will block the thread until the task is complete (calling Wait or Result after the task has completed is perfectly efficient and safe because the result is already available, and there’s no need for blocking).
+
+## 💎 How does async and await work?
+
+1. First, we mark our method with the `async` keyword
+2. We can no longer return an `value` because as an asynchronous method, our method will return immediately and complete its work later. It’s not possible to return an `value` because we don’t know the correct value at the time the method returns! So for that we use —`Task<int>`. 
+3. Insert the `await` keyword before the async method call call. The `await` keyword tells the compiler that the code needs to be suspended at this point and resumed when whatever async operation you are waiting for completes.
+
+![alt text](image-4.png)
+![alt text](image-5.png)
+Just like with `yield return`, the compiler divides the function into chunks and added code to call them at the correct time.
+
+> **⚠** You should not use `async void`
+
+> 🎯 An async method often returns a result immediately without doing anything asynchronous, you can improve the efficiency by returning `ValueTask` or `ValueTask<T>` instead of `Task` or `Task<T>`. **This is perfect for checking the cache and returning the value immediately.** ValueTask and ValueTask<T> are slightly less efficient than Task and Task<T> if there is an asynchronous operation, but much more efficient if the result was available immediately. It is recommended to return a ValueTask in methods that usually return a value without performing an asynchronous operation, especially if those methods are called often.
+
+## ♦ Multithreading
+
+You create a thread from the `System.Threading.Thread`.  To create a new thread, you first create a new `Thread` object, passing a callback with the code you want to run in the new thread to the constructor. You call `Thread.Start` to start the thread. The Thread.Join() wait so all the threads all finish.
+```c#
+   var threads = new Thread[3];
+   for(int i=0;i<3;++i)   {
+      threads[i] = new Thread(DoWork);
+      threads[i].Start();
+   }
+
+   foreach(var current in threads)  
+   {
+      current.Join();
+   }
+   Console.WriteLine("Finished");
+```
+
+> 💡 It is not reccomended to use Thread.Start for :
+* Asynchronous code
+* Short tasks
+
+## 🌊 Thread pool
+ 
+Thread pool manages the thread creation and destruction. With the thread pool, the system keeps a small number of threads waiting in the background, and whenever you have something to run, you can use one of those pre-existing threads to run it. The thread pool is optimized for short-running tasks
+
+> The thread pool is optimized to run many short-running tasks, and we know that asynchronous tasks are actually a sequence of short tasks, so the thread pool is ideal for running asynchronous code.
+
+The `Task.Run` method runs code on the thread pool
+```c#
+var tasks = new Task[10];
+for(int i=0;i<10;++i) 
+{
+    tasks[i] = Task.Run(RunInPool);  
+}
+await Task.WhenAll(tasks);  
+Console.WriteLine("All finished");
+```
+
+The `Task.WhenAll` is similar to Thread.Join, but it doesn't require a loop and waits asynchronously. If you await Task.Run, you are telling your compiler to wait for the task to complete before moving to the next line of code, essentially making it run sequentially, which defeats the purpose of using Task.Run. 
+
+> ⚠ Lambda function captures the variables by reference so for example if you pass an variable i in a for loop that changes you may get unpredictable results. So you should use :
+```c#
+for(int i=0;i<10;++i)
+{
+    var icopy = i;
+    Task.Run(()=>
+    {
+        Console.WriteLine($"Hello from thread {icopy}");
+    });
+}
+```
+
+Use Task.Run for :
+- Code that uses async-await
+- Short running tasks
+Do not use Task.Run for : 
+- Non asynchronous long running tasks
+
+### 🔒 Locking
+
+> Whenever a thread needs to access the shared state(variable), it “locks” it, and when it is finished with the data, it “releases” the lock. If another thread tries to lock the data while it is already locked, it must wait until the data is released by the current user.This is called a _mutex_ (short for mutual exclusion). In C#, we have the Mutex class that represents the operating system’s mutex implementation and the lock statement that uses an internal .NET implementation. The lock statement is easier to use and faster (because it doesn’t require a system call), so we will prefer to use it. 
+
+```c#
+int theValue = 0;
+object theLock = new Object();
+var threads = new Thread[2];
+for(int i=0;i<2;++i)
+{
+    threads[i] = new Thread(()=>
+    {
+        for(int j=0;j<5000000;++j)
+        {
+            lock(theLock)  
+            {  
+                ++theValue;  
+            } 
+        }
+    });
+
+    threads[i].Start();
+}
+foreach(var current in threads) 
+{ 
+    current.Join();
+}
+Console.WriteLine(theValue);
+```
+
+> 💡 It is best practice is to utilize an internal object that is used just for the lock and is accessible only to the code that needs it and because we’re not going to use this object for anything else.
+
+### 🔓 Deadlocks
+
+A deadlock is the situation where a thread or multiple threads are stuck waiting for something that will never happen. The simplest example is where one thread locked mutex A and is waiting for mutex B, while a second thread locked mutex B and is waiting for mutex A.
+![alt text](image-6.png)
