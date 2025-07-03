@@ -244,3 +244,12 @@ The best solution is to rearrange your code and move the await outside of the lo
 async/await where it makes sense to you.
 - If you add code to a codebase that does not use async/await, avoid async/await in the code as much as possible. If you decide to use async/await in the new code, consider refactoring at least the code that calls the new code to also use async/await.
 - If you write code that only does one thing simultaneously, don’t use async/await
+
+## Async/Await best practises 
+
+1. Never use `.Wait()` or `.Result`, this will block the thread and make it synchronous plus it with throw and `AggregateException`(an exception of exceptions), use `.GetAwaiter().Result()` for syncrhonouse because this will throw an error to the current stack trace.
+2. Always use await for asynchronous code.
+3. Never use `async void` because you cannot catch in a try/catch block when it throws an exception.
+4. When you are using return await consider returning just the `Task` and not awaiting to not avoid a context switch, but don't do this if you are in a `try/catch` block.
+5. Consider using `ConfigureAwait(false)` when you don't want to resume in the same synchronization context, but in .NET CORE doesn't have a synchronization context so it is the same of not using it.
+6. Use `ValueTask` when you can return another value before the `await`./
