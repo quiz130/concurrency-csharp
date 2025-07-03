@@ -253,3 +253,7 @@ async/await where it makes sense to you.
 4. When you are using return await consider returning just the `Task` and not awaiting to not avoid a context switch, but don't do this if you are in a `try/catch` block.
 5. Consider using `ConfigureAwait(false)` when you don't want to resume in the same synchronization context, but in .NET CORE doesn't have a synchronization context so it is the same of not using it.
 6. Use `ValueTask` when you can return another value before the `await`./
+
+**Synchronization context** represents the environmnet in which asynchronous operations run. It ensures that asyncrhronous code can interact correctly with environments that have specific requirements, such as UI threads in Windows Forms or WPF applications.
+
+`ConfigureAwait` allows developers to specify whether or not to return the execution to the original synchronization context after an asynchronous operation completes.
